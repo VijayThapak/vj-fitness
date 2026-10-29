@@ -7,6 +7,7 @@
   If the KEYSTORE_B64 environment variable is set (a GitHub secret), that key is used instead.
 """
 import base64
+import json
 import os
 import re
 import shutil
@@ -51,6 +52,37 @@ def patch_ios():
     print("iOS Info.plist patched")
 
 
+def patch_web():
+    """Name and colours for the browser version (shown when added to the home screen)."""
+    web = ROOT / "web"
+    if not web.exists():
+        return
+    mf = web / "manifest.json"
+    m = json.loads(mf.read_text())
+    m.update({
+        "name": "VJ Fit",
+        "short_name": "VJ Fit",
+        "description": "Workout plans, exercise library and vegetarian diet charts.",
+        "start_url": ".",
+        "display": "standalone",
+        "orientation": "portrait",
+        "background_color": "#1F5FBF",
+        "theme_color": "#1F5FBF",
+    })
+    mf.write_text(json.dumps(m, indent=2))
+    page = web / "index.html"
+    s = page.read_text()
+    s = re.sub(r"<title>[^<]*</title>", "<title>VJ Fit</title>", s)
+    s = re.sub(r'(name="apple-mobile-web-app-title" content=")[^"]*"', r'\1VJ Fit"', s)
+    s = re.sub(r'(name="description" content=")[^"]*"', r'\1Workout plans, exercise library and vegetarian diet charts."', s)
+    if 'name="theme-color"' not in s:
+        s = s.replace("</head>", '  <meta name="theme-color" content="#1F5FBF">\n</head>')
+    if "apple-mobile-web-app-status-bar-style" not in s:
+        s = s.replace("</head>", '  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n</head>')
+    page.write_text(s)
+    print("Web manifest and page patched")
+
+
 def install_key():
     dest = Path.home() / ".android" / "debug.keystore"
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -64,6 +96,10 @@ def install_key():
 
 
 if __name__ == "__main__":
-    patch_android()
-    patch_ios()
-    install_key()
+    import sys
+    if "--web" in sys.argv:
+        patch_web()
+    else:
+        patch_android()
+        patch_ios()
+        install_key()

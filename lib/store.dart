@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:path_provider/path_provider.dart';
+
 
 import 'models.dart';
+import 'platform/platform.dart' as platform;
 
 /// Holds all app data and saves it to a JSON file on the phone.
 class Store extends ChangeNotifier {
@@ -30,8 +30,11 @@ class Store extends ChangeNotifier {
 
   final Map<String, Exercise> _exMap = {};
   final Map<String, Food> _foodMap = {};
-  File? _file;
   Timer? _saveTimer;
+  bool _canSave = false;
+
+  /// Set when the last save failed (for example browser storage is full).
+  String? saveError;
 
   Future<void> load() async {
     final exJson = jsonDecode(await rootBundle.loadString('assets/data/exercises.json')) as List;
@@ -39,17 +42,17 @@ class Store extends ChangeNotifier {
     final foodJson = jsonDecode(await rootBundle.loadString('assets/data/foods.json')) as List;
     libraryFoods = [for (final e in foodJson) Food.fromLibrary(e as Map<String, dynamic>)];
 
-    final dir = await getApplicationDocumentsDirectory();
-    _file = File('${dir.path}/vjfit_data.json');
     var loaded = false;
-    if (await _file!.exists()) {
-      try {
-        _apply(jsonDecode(await _file!.readAsString()) as Map<String, dynamic>);
+    try {
+      final saved = await platform.loadData();
+      if (saved != null) {
+        _apply(jsonDecode(saved) as Map<String, dynamic>);
         loaded = true;
-      } catch (e) {
-        debugPrint('Could not read saved data: $e');
       }
+    } catch (e) {
+      debugPrint('Could not read saved data: $e');
     }
+    _canSave = true;
     if (!loaded || plans.isEmpty) {
       final p = jsonDecode(await rootBundle.loadString('assets/data/plans.json')) as List;
       plans = [for (final e in p) WorkoutPlan.fromJson(e as Map<String, dynamic>)];
@@ -124,15 +127,18 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> saveNow() async {
-    final f = _file;
-    if (f == null) return;
+    if (!_canSave) return;
+    final hadError = saveError != null;
     try {
-      final tmp = File('${f.path}.tmp');
-      await tmp.writeAsString(jsonEncode(toJson()));
-      await tmp.rename(f.path);
+      await platform.saveData(jsonEncode(toJson()));
+      saveError = null;
     } catch (e) {
       debugPrint('Save failed: $e');
+      saveError = platform.isWeb
+          ? 'Your latest changes could not be saved. Browser storage may be full or blocked. Back up your data from the Me tab.'
+          : 'Your latest changes could not be saved. Check that your phone has free space.';
     }
+    if (hadError != (saveError != null)) notifyListeners();
   }
 
   String exportBackup() => const JsonEncoder.withIndent(' ').convert(toJson());

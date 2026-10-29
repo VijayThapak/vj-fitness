@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK and website
 
 on:
   push:
@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: build-apk
@@ -90,3 +92,60 @@ jobs:
             Download **VJ-Fit.apk** below and open it on your Android phone to install.
             If Android asks, allow "Install unknown apps" for your browser or file manager.
             Installing a newer version keeps your data.
+
+  web:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate web project files
+        shell: bash
+        run: |
+          flutter create --org com.vjfit --project-name vj_fit --platforms web . 2>&1 | tee -a web-log.txt
+          rm -f test/widget_test.dart
+
+      - name: Get packages
+        shell: bash
+        run: flutter pub get 2>&1 | tee -a web-log.txt
+
+      - name: App icon
+        shell: bash
+        run: dart run flutter_launcher_icons 2>&1 | tee -a web-log.txt
+
+      - name: Apply app name and colours
+        run: python3 tool/setup_platforms.py --web
+
+      - name: Build website
+        shell: bash
+        run: |
+          set -o pipefail
+          flutter build web --release --base-href "/${{ github.event.repository.name }}/" \
+            --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }} 2>&1 | tee -a web-log.txt
+          touch build/web/.nojekyll
+
+      - name: Save build log to the ci-logs branch
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p /tmp/weblog && cd /tmp/weblog
+          git init -q && git checkout -q -b ci-logs-web
+          { echo "run ${{ github.run_number }} commit ${{ github.sha }}"; cat "$GITHUB_WORKSPACE/web-log.txt" 2>/dev/null; } > web-log.txt
+          git add . && git -c user.name="VJ Fit CI" -c user.email="ci@vjfit.invalid" commit -qm "Web build log for run ${{ github.run_number }}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-logs-web
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

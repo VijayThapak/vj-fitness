@@ -37,6 +37,16 @@ class VjFitApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: _theme(Brightness.light),
       darkTheme: _theme(Brightness.dark),
+      // On a laptop browser, keep the app phone-width in the middle of the screen.
+      builder: (context, child) => ColoredBox(
+        color: Theme.of(context).colorScheme.surfaceContainerLowest,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: child,
+          ),
+        ),
+      ),
       home: ListenableBuilder(
         listenable: store,
         builder: (context, _) => store.ready ? const HomeShell() : const _Splash(),
@@ -106,6 +116,19 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       child: Scaffold(
         body: IndexedStack(index: tab, children: pages),
         bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListenableBuilder(
+            listenable: store,
+            builder: (context, _) => store.saveError == null
+                ? const SizedBox.shrink()
+                : Material(
+                    color: Theme.of(context).colorScheme.errorContainer,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                      child: Text(store.saveError!,
+                          style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer)),
+                    ),
+                  ),
+          ),
           const RestTimerBar(),
           NavigationBar(
             selectedIndex: tab,

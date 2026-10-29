@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
@@ -7,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'models.dart';
+import 'platform/platform.dart' as platform;
 
 String fmtNum(double v, [int digits = 0]) {
   if (digits == 0) return v.round().toString();
@@ -32,7 +32,7 @@ class AppImage extends StatelessWidget {
     if (path.startsWith('assets/')) {
       return Image.asset(path, fit: fit, gaplessPlayback: true, errorBuilder: err);
     }
-    return Image.file(File(path), fit: fit, gaplessPlayback: true, errorBuilder: err);
+    return Image(image: platform.photoImage(path), fit: fit, gaplessPlayback: true, errorBuilder: err);
   }
 }
 

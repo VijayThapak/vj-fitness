@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import '../platform/platform.dart' as platform;
 import '../store.dart';
 import '../widgets.dart';
 
@@ -44,10 +45,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _export() async {
     try {
+      final fileName = 'vjfit-backup-${dateKey(DateTime.now())}.json';
+      if (await platform.downloadText(fileName, store.exportBackup())) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Backup downloaded. Keep the file somewhere safe, like Files or Google Drive.')));
+        }
+        return;
+      }
       final bytes = Uint8List.fromList(utf8.encode(store.exportBackup()));
       final path = await FilePicker.platform.saveFile(
         dialogTitle: 'Save VJ Fit backup',
-        fileName: 'vjfit-backup-${dateKey(DateTime.now())}.json',
+        fileName: fileName,
         bytes: bytes,
       );
       if (!mounted) return;
@@ -61,7 +70,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _import() async {
     final ok = await confirm(context, 'Restore a backup?',
-        'This replaces your plans, diets, own exercises, own foods and logs on this phone with the ones in the backup file.',
+        'This replaces your plans, diets, own exercises, own foods and logs ${platform.isWeb ? 'in this browser' : 'on this phone'} with the ones in the backup file.',
         action: 'Choose file');
     if (!ok) return;
     try {
@@ -160,7 +169,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SectionTitle('Workout history'),
               _History(),
               const SectionTitle('Backup'),
-              Text('Your data is stored only on this phone. Save a backup before changing phones or reinstalling.',
+              Text(
+                  platform.isWeb
+                      ? 'Your data is stored only in this browser on this device. Other browsers and devices start empty. '
+                          'Save a backup now and then, and before clearing browser data.'
+                      : 'Your data is stored only on this phone. Save a backup before changing phones or reinstalling.',
                   style: TextStyle(color: cs.onSurfaceVariant)),
               const SizedBox(height: 8),
               Wrap(spacing: 10, runSpacing: 10, children: [

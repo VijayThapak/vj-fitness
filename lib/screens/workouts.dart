@@ -1,10 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../models.dart';
+import '../platform/platform.dart' as platform;
 import '../store.dart';
 import '../widgets.dart';
 
@@ -782,17 +780,19 @@ class _CustomExerciseFormState extends State<CustomExerciseForm> {
 
   Future<void> _pickPhoto(ImageSource src) async {
     try {
-      final x = await ImagePicker().pickImage(source: src, maxWidth: 1000, imageQuality: 80);
+      final x = await ImagePicker().pickImage(
+          source: src, maxWidth: platform.isWeb ? 640 : 1000, imageQuality: platform.isWeb ? 70 : 80);
       if (x == null) return;
-      final dir = await getApplicationDocumentsDirectory();
-      final photos = Directory('${dir.path}/photos');
-      if (!await photos.exists()) await photos.create(recursive: true);
-      final dest = '${photos.path}/${newId()}.jpg';
-      await File(x.path).copy(dest);
+      final dest = await platform.keepPhoto(x, newId());
+      if (!mounted) return;
       setState(() => images.add(dest));
+    } on StateError catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not add the photo. Allow camera or photo access and try again.')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not add the photo. Allow camera or photo access and try again.')));
       }
     }
   }

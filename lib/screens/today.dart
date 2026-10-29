@@ -30,7 +30,7 @@ class _TodayScreenState extends State<TodayScreen> {
       setState(() => awake = !awake);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This phone does not allow keeping the screen on.')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This device does not allow keeping the screen on.')));
       }
     }
   }
