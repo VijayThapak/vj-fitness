@@ -32,8 +32,9 @@ jobs:
         run: flutter --version
 
       - name: Generate Android and iOS project files
+        shell: bash
         run: |
-          flutter create --org com.vjfit --project-name vj_fit --platforms android,ios .
+          flutter create --org com.vjfit --project-name vj_fit --platforms android,ios . 2>&1 | tee -a ci-log.txt
           rm -f test/widget_test.dart
 
       - name: Apply app name, permissions and signing key
@@ -42,17 +43,21 @@ jobs:
         run: python3 tool/setup_platforms.py
 
       - name: Get packages
-        run: flutter pub get
+        shell: bash
+        run: flutter pub get 2>&1 | tee -a ci-log.txt
 
       - name: App icon
-        run: dart run flutter_launcher_icons
+        shell: bash
+        run: dart run flutter_launcher_icons 2>&1 | tee -a ci-log.txt
 
       - name: Check code
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        shell: bash
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee -a ci-log.txt
         continue-on-error: true
 
       - name: Build APK
-        run: flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }}
+        shell: bash
+        run: flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }} 2>&1 | tee -a ci-log.txt
 
       - name: Rename APK
         run: cp build/app/outputs/flutter-apk/app-release.apk VJ-Fit.apk
@@ -61,6 +66,18 @@ jobs:
         with:
           name: VJ-Fit-apk
           path: VJ-Fit.apk
+
+      - name: Save build log to the ci-logs branch
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p /tmp/cilog
+          { echo "run ${{ github.run_number }} commit ${{ github.sha }}"; flutter --version 2>&1; cat ci-log.txt 2>/dev/null; } > /tmp/cilog/ci-log.txt
+          cp pubspec.lock /tmp/cilog/ 2>/dev/null || true
+          cd /tmp/cilog
+          git init -q && git checkout -q -b ci-logs && git add .
+          git -c user.name="VJ Fit CI" -c user.email="ci@vjfit.invalid" commit -qm "Build log for run ${{ github.run_number }}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-logs
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
