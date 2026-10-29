@@ -79,9 +79,11 @@ jobs:
         shell: bash
         run: |
           SIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
-          "$SIGNER" verify --verbose --print-certs VJ-Fit.apk 2>&1 | grep -v WARNING | tee -a ci-log.txt
-          "$SIGNER" verify --verbose VJ-Fit.apk | grep -q "v1 scheme (JAR signing): true"
-          "$SIGNER" verify --verbose VJ-Fit.apk | grep -q "v2 scheme (APK Signature Scheme v2): true"
+          unzip -l VJ-Fit.apk 'META-INF/*.SF' 'META-INF/*.RSA' 'META-INF/MANIFEST.MF' | tee -a ci-log.txt
+          # --min-sdk-version 21 makes apksigner check the v1 signature too
+          "$SIGNER" verify --verbose --print-certs --min-sdk-version 21 VJ-Fit.apk 2>&1 | grep -v WARNING | tee -a ci-log.txt
+          "$SIGNER" verify --verbose --min-sdk-version 21 VJ-Fit.apk | grep -q "v1 scheme (JAR signing): true"
+          "$SIGNER" verify --verbose --min-sdk-version 21 VJ-Fit.apk | grep -q "v2 scheme (APK Signature Scheme v2): true"
 
       - uses: actions/upload-artifact@v4
         with:
