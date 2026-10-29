@@ -61,8 +61,19 @@ jobs:
         shell: bash
         run: flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }} 2>&1 | tee -a ci-log.txt
 
-      - name: Rename APK
-        run: cp build/app/outputs/flutter-apk/app-release.apk VJ-Fit.apk
+      - name: Sign APK with v1 + v2 + v3 signatures
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          # Gradle leaves out the old v1 signature on Android 7+ builds; some phones
+          # (Vivo/iQOO, Oppo) still want it, so re-sign with all three schemes.
+          KS=tool/vjfit-release.jks
+          if [ -n "$KEYSTORE_B64" ]; then KS=build-release.jks; fi
+          SIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          "$SIGNER" sign --ks "$KS" --ks-key-alias vjfit --ks-pass pass:vjfitapp --key-pass pass:vjfitapp \
+            --min-sdk-version 21 --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
+            --out VJ-Fit.apk build/app/outputs/flutter-apk/app-release.apk
 
       - name: Check APK signature
         shell: bash
