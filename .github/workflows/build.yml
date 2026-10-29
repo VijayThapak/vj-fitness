@@ -109,7 +109,8 @@ jobs:
       - name: Generate web project files
         shell: bash
         run: |
-          flutter create --org com.vjfit --project-name vj_fit --platforms web . 2>&1 | tee -a web-log.txt
+          # Android/iOS folders are created too because the icon tool updates all of them.
+          flutter create --org com.vjfit --project-name vj_fit --platforms android,ios,web . 2>&1 | tee -a web-log.txt
           rm -f test/widget_test.dart
 
       - name: Get packages
