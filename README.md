@@ -35,7 +35,10 @@ flutter run
 
 ## Signing key
 
-`tool/vjfit.keystore` signs the APK so updates install over older versions. This repo is public, so anyone can see that key. Before publishing on the Play Store, create a private key and store it as the `KEYSTORE_B64` repository secret (base64 of the keystore file, alias `androiddebugkey`, password `android`). The build uses the secret when it is set.
+`tool/vjfit-release.jks` signs the APK (v1 + v2 + v3 signatures) so updates install over older versions.
+This repo is public, so anyone can see that key. Before publishing on the Play Store, create a private key
+and store it as the `KEYSTORE_B64` repository secret (base64 of a PKCS12 keystore, alias `vjfit`,
+password `vjfitapp`). The build uses the secret when it is set.
 
 ## Credits
 

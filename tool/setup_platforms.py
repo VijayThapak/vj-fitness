@@ -3,14 +3,13 @@
 - App name shown on the phone: "VJ Fit"
 - Lets the app open YouTube/browser links (Android 11+ package visibility)
 - Camera / photo library permission text for iOS
-- Fixed signing key, so a new APK installs over the old one without losing data.
-  If the KEYSTORE_B64 environment variable is set (a GitHub secret), that key is used instead.
+- VJ Fit signing key with v1+v2+v3 signatures, so a new APK installs over the old one
+  without losing data. If the KEYSTORE_B64 secret is set, that key is used instead.
 """
 import base64
 import json
 import os
 import re
-import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -84,15 +83,42 @@ def patch_web():
 
 
 def install_key():
-    dest = Path.home() / ".android" / "debug.keystore"
-    dest.parent.mkdir(parents=True, exist_ok=True)
+    """Signs release APKs with the VJ Fit key, using v1 + v2 + v3 signatures.
+
+    Some phone brands (Vivo/iQOO, Oppo, Xiaomi) reject APKs signed with Android's
+    generic debug certificate or with only the newer signature format.
+    If the KEYSTORE_B64 secret is set, that keystore is used instead (same alias and password).
+    """
+    key = ROOT / "tool/vjfit-release.jks"
     b64 = os.environ.get("KEYSTORE_B64", "").strip()
     if b64:
-        dest.write_bytes(base64.b64decode(b64))
-        print("Signing key installed from KEYSTORE_B64 secret")
-    else:
-        shutil.copy(ROOT / "tool/vjfit.keystore", dest)
-        print("Signing key installed from tool/vjfit.keystore")
+        key = ROOT / "build-release.jks"
+        key.write_bytes(base64.b64decode(b64))
+        print("Signing key from KEYSTORE_B64 secret")
+    gradle = ROOT / "android/app/build.gradle.kts"
+    s = gradle.read_text()
+    block = (
+        '    signingConfigs {\n'
+        '        create("vjfit") {\n'
+        f'            storeFile = file("{key.as_posix()}")\n'
+        '            storePassword = "vjfitapp"\n'
+        '            keyAlias = "vjfit"\n'
+        '            keyPassword = "vjfitapp"\n'
+        '            enableV1Signing = true\n'
+        '            enableV2Signing = true\n'
+        '            enableV3Signing = true\n'
+        '        }\n'
+        '    }\n\n'
+    )
+    if 'create("vjfit")' not in s:
+        i = s.index("    buildTypes {")
+        s = s[:i] + block + s[i:]
+    s, n = re.subn(r'signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)',
+                   'signingConfig = signingConfigs.getByName("vjfit")', s)
+    if n == 0 and 'getByName("vjfit")' not in s:
+        raise SystemExit("Could not find the release signingConfig line in build.gradle.kts")
+    gradle.write_text(s)
+    print("Release signing set to the VJ Fit key (v1+v2+v3)")
 
 
 if __name__ == "__main__":
